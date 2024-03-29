@@ -103,7 +103,18 @@ class TMC2209Usermod : public Usermod {
       // do your set-up here
       Serial.println("Hello from TMC2209 usermod!");
 
-      if (!enabled) return;
+
+    }
+
+
+    /*
+     * connected() is called every time the WiFi is (re)connected
+     * Use it to initialize network interfaces
+     */
+    void connected() {
+      //Serial.println("Connected to WiFi!");
+
+     
 
       PinManagerPinType pins[3] = { { RXD2Pin, false }, { TXD2Pin, true }, { ENNPin, true } };
       if (!pinManager.allocateMultiplePins(pins, 3, PinOwner::UM_Example)) {
@@ -116,11 +127,20 @@ class TMC2209Usermod : public Usermod {
       pinMode(RXD2Pin, INPUT);
       pinMode(TXD2Pin, OUTPUT);
       pinMode(ENNPin, OUTPUT);
+      // disable TMC2209 output
+      digitalWrite(ENNPin, HIGH);
 
 
-      Serial2.begin(115200, SERIAL_8N1, RXD2Pin, TXD2Pin);
+      //Serial2.begin(115200, SERIAL_8N1, RXD2Pin, TXD2Pin);
 
-      stepper_driver.setup(Serial2);
+
+      if (!enabled) return;
+     
+      stepper_driver.setup(Serial2, 115200L, TMC2209::SERIAL_ADDRESS_0, RXD2Pin, TXD2Pin);
+
+
+
+
 
       stepper_driver.setRunCurrent(RUN_CURRENT_PERCENT);
       stepper_driver.setHoldCurrent(20);
@@ -140,21 +160,15 @@ class TMC2209Usermod : public Usermod {
       stepper_driver.moveAtVelocity(VELOCITY);
 
 
+
+
       // enable TMC2209 output
       digitalWrite(ENNPin, LOW);
 
+
+
+
       initDone = true;
-    }
-
-
-    /*
-     * connected() is called every time the WiFi is (re)connected
-     * Use it to initialize network interfaces
-     */
-    void connected() {
-      //Serial.println("Connected to WiFi!");
-
-
     }
 
 

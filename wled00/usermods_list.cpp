@@ -16,6 +16,10 @@
   #include "../usermods/TMC2209/TMC2209_usermod.h"
 #endif
 
+#ifdef USERMOD_JELLYFISH
+  #include "../usermods/Jellyfish/Jellyfish_usermod.h"
+#endif
+
 #ifdef USERMOD_BATTERY
   #include "../usermods/Battery/usermod_v2_Battery.h"
 #endif
@@ -216,6 +220,10 @@ void registerUsermods()
   //usermods.add(new MyExampleUsermod());
   #ifdef USERMOD_TMC2209
   usermods.add(new TMC2209Usermod());
+  #endif
+  
+  #ifdef USERMOD_JELLYFISH
+  usermods.add(new JellyfishUsermod());
   #endif
   
   
