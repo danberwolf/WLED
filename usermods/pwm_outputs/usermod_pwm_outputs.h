@@ -39,7 +39,8 @@ class PwmOutput {
         return;
       }
 
-      ledcSetup(channel_, freq_, bit_depth_);
+      //ledcSetup(channel_, freq_, bit_depth_);
+      ledcSetup(channel_, 10000, bit_depth_);
       ledcAttachPin(pin_, channel_);
       DEBUG_PRINTF("pwm_output[%d]: init successful\n", pin_);
       enabled_ = true;
@@ -136,6 +137,10 @@ class PwmOutputsUsermod : public Usermod {
 
     void setup() {
       // By default all PWM outputs are disabled, no setup do be done
+
+        PwmOutput& pwm = pwms_[0];
+        if (pwm.isEnabled())
+          pwm.setDuty((float)(0.4f));
     }
 
     void loop() {
