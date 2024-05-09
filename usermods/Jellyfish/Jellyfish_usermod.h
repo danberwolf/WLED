@@ -60,6 +60,7 @@ class JellyfishUsermod : public Usermod {
 
 
     const int32_t veloArray[21] = {52000,70000,90000,110000,95000,90000,85000,80000,75000,70000,65000,60000,55000,54000,54000,54000,52000,52000,52000,52000,52000};
+    const int32_t veloRampSpeed = 5000;   
     unsigned long currentTime;
     unsigned long loopTime;
     int step = 0;
@@ -77,9 +78,16 @@ class JellyfishUsermod : public Usermod {
     int8_t HallSensPin = 7; // hall sensor trigger pin (active low)
     
 
-    int32_t VELOCITY = 60000;   
+    int32_t VELOCITY = 55000;   
+    int32_t curr_velocity = 0;
+    int32_t target_velocity = 0;
+    int32_t velo_ramp_step = 0;
+    int32_t velo_ramp_cur = 0;
+    unsigned long lastTimeVelo = 0;    
+
+
     uint8_t RUN_CURRENT_PERCENT = 20;
-    uint8_t PWM_gradient = 170;
+    uint8_t PWM_gradient = 80;          // upper limit should be at 80 to 100, otherwise motor current and temperature are too high
     unsigned long Microsteps = 256;
 
     // Instantiate TMC2209
@@ -132,11 +140,15 @@ class JellyfishUsermod : public Usermod {
     //   #endif
 
 
+
+
+
+
     void enableMotion()
     {
       motion_enabled = true;
       stepper_driver.enable();
-      stepper_driver.moveAtVelocity(VELOCITY);
+      stepper_driver.moveAtVelocity(curr_velocity);
 
       // enable TMC2209 output
       digitalWrite(ENNPin, LOW);
@@ -149,6 +161,85 @@ class JellyfishUsermod : public Usermod {
       // disable TMC2209 output
       digitalWrite(ENNPin, HIGH);
     }    
+
+
+
+
+    void MotionRampUp()
+    {
+      lastTimeVelo = millis();
+
+      target_velocity = VELOCITY;
+      velo_ramp_cur = veloRampSpeed;
+      curr_velocity = veloRampSpeed;
+      enableMotion();
+    }
+
+    void MotionRampDown()
+    {
+      lastTimeVelo = millis();
+
+      target_velocity = 0;
+      velo_ramp_cur =- veloRampSpeed;
+      curr_velocity -= veloRampSpeed;
+
+      if(curr_velocity <= 0)
+      {
+        disableMotion();
+      }
+    }
+
+    void MotionRampUpdate()
+    {
+      if(motion_enabled)
+      {
+
+        if(curr_velocity != target_velocity)
+        {
+
+          if (millis() - lastTimeVelo > 100) 
+          {
+              lastTimeVelo = millis();
+
+              curr_velocity += velo_ramp_cur;
+              
+              if(velo_ramp_cur < 0)
+              {
+                  if(curr_velocity <= 0)
+                  {
+                    curr_velocity = 0;
+                    velo_ramp_cur = 0;
+                  }
+              }
+
+              if(velo_ramp_cur > 0)
+              {
+                  if(curr_velocity >= target_velocity)
+                  {
+                    curr_velocity = target_velocity;
+                    velo_ramp_cur = 0;
+                  }
+              }
+
+              stepper_driver.moveAtVelocity(curr_velocity);
+
+              if(curr_velocity == 0)
+              {
+                // switch off motor driver
+                disableMotion();
+              }
+          }
+        }
+      }
+    }
+
+
+
+
+
+
+
+
 
     // methods called by WLED (can be inlined as they are called only once but if you call them explicitly define them out of class)
 
@@ -183,7 +274,7 @@ class JellyfishUsermod : public Usermod {
 
       stepper_driver.setup(Serial2, 115200L, TMC2209::SERIAL_ADDRESS_0, RXD2Pin, TXD2Pin);
       stepper_driver.setRunCurrent(RUN_CURRENT_PERCENT);
-      stepper_driver.setHoldCurrent(20);
+      stepper_driver.setHoldCurrent(0);
       //stepper_driver.useInternalSenseResistors();
       //stepper_driver.disableStealthChop();
       stepper_driver.disableAutomaticGradientAdaptation();
@@ -246,7 +337,11 @@ class JellyfishUsermod : public Usermod {
       if (!enabled || strip.isUpdating()) return;
 
       // do your magic here
-      if (millis() - lastTime > 5000) {
+
+      MotionRampUpdate();   // update motor speed if required
+
+      if (millis() - lastTime > 5000) 
+      {
         //Serial.println("I'm alive!");
         lastTime = millis();
 
@@ -436,8 +531,8 @@ class JellyfishUsermod : public Usermod {
 
       //usermod["user0"] = userVar0;
 
-      JsonObject motorState = usermod.createNestedObject(F("motorState"));
-      motorState[F("motion")] = motion_enabled ? "false" : "true";      
+      JsonObject motorState = usermod.createNestedObject(FPSTR(_motion));
+      motorState[FPSTR(_motion)] = motion_enabled ? false : true;      
     }
 
 
@@ -470,12 +565,14 @@ class JellyfishUsermod : public Usermod {
 
         if(en == true)
         {
-          enableMotion();
+          //enableMotion();
+          MotionRampUp();
           Serial.print("enableMotion");
         }
         else
         {
-          disableMotion();
+          //disableMotion();
+          MotionRampDown();
           Serial.print("disableMotion");
         }
 
@@ -873,8 +970,19 @@ class JellyfishUsermod : public Usermod {
      * onStateChanged() is used to detect WLED state change
      * @mode parameter is CALL_MODE_... parameter used for notifications
      */
-    void onStateChange(uint8_t mode) {
+    void onStateChange(uint8_t mode) 
+    {
       // do something if WLED state changed (color, brightness, effect, preset, etc)
+
+        if (bri == 0)
+        {
+          MotionRampDown();
+        }
+        else
+        {
+          MotionRampUp();
+        }
+
     }
 
 
